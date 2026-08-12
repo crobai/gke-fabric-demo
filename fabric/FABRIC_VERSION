@@ -1,0 +1,2 @@
+v57.0.0
+modules: gke-cluster-autopilot, gke-cluster-standard, gke-hub, gke-nodepool
