@@ -51,3 +51,8 @@ output "subnet_self_link" {
   description = "Created GKE subnet self link."
   value       = google_compute_subnetwork.gke.self_link
 }
+
+output "next_plane_hint" {
+  description = "Next IDP plane after platform-up."
+  value       = "cd tenant-guardrails && terraform init && terraform apply"
+}

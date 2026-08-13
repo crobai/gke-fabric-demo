@@ -5,7 +5,7 @@ locals {
   cluster_labels = {
     environment = "dev"
     managed-by  = "terraform"
-    role      = "shared-workload"
-    idp-plane = "platform"
+    role        = "shared-workload"
+    idp-plane   = "platform"
   }
 }
