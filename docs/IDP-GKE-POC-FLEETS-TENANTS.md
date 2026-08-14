@@ -1,8 +1,8 @@
 # IDP GKE PoC: locked scope and client demo design
 
-Design baseline for this repo’s PoC vs Confluence platform docs (shared multi-workload GKE + namespace guardrails). Implementation checklist: [../DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md).
+Design baseline for this repo’s PoC vs **Confluence** platform docs (shared multi-workload GKE + namespace guardrails).
 
-Related: [IDP-GKE-CONSIDERATIONS.md](IDP-GKE-CONSIDERATIONS.md).
+Related: [IDP-GKE-CONSIDERATIONS.md](IDP-GKE-CONSIDERATIONS.md) · [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) · [../STANDARD_GKE_PLAN.md](../STANDARD_GKE_PLAN.md) (local cutover notes).
 
 ---
 
@@ -12,8 +12,10 @@ Related: [IDP-GKE-CONSIDERATIONS.md](IDP-GKE-CONSIDERATIONS.md).
 |-------|----------|
 | GCP project | **`roberto-gke` = DEV / nonprod only** |
 | Policy folders (`prod` / `nonprod`) | **Not inside the project** (org-level only). Prod = later project/folder. |
-| Cluster mode | **One shared Autopilot** cluster (idle-cheap PoC; Confluence production default remains **Standard**) |
-| Fleet | **One fleet** (hard limit: one fleet per GCP project). Register the shared cluster for Hub visibility. |
+| Cluster mode | **One shared Standard** cluster + **one** node pool — matches Confluence default (`gke-cluster-standard` + `gke-nodepool`) |
+| Network / access | **Project VPC** + **private nodes** + **DNS endpoint** + Cloud NAT — **approximation** of LZ Shared VPC + private runtime (see §4) |
+| Capacity knobs | Catalog-shaped: `machine_type`, `max_pods_per_node`, pool autoscaling min/max (`terraform.tfvars` → `standard{}`) |
+| Fleet | **One fleet** (one fleet per GCP project). Register the shared cluster for Hub visibility. |
 | Tenancy | **Namespace isolation** on that shared cluster — **not** cluster-per-plane |
 | Tenants | Namespaces: `t1-front`, `t2-back`, `t3-db` |
 | Guardrails | Per namespace: **RBAC** + **ResourceQuota** (+ LimitRange) + **NetworkPolicy** |
@@ -24,7 +26,7 @@ Related: [IDP-GKE-CONSIDERATIONS.md](IDP-GKE-CONSIDERATIONS.md).
 flowchart TB
   subgraph project [roberto-gke_DEV]
     subgraph fleet [One_Fleet]
-      c1[shared_autopilot]
+      c1[shared_standard]
     end
     c1 --> ns1[t1_front]
     c1 --> ns2[t2_back]
@@ -43,7 +45,7 @@ flowchart TB
 
 | Plane | Who | Owns | PoC path |
 |-------|-----|------|----------|
-| **Platform** | Platform engineers | Cluster, fleet, network, APIs | Repo root / `make platform-up` |
+| **Platform** | Platform engineers | Cluster, node pool, fleet, network, APIs; capacity knobs | Repo root / `make platform-up` |
 | **Portal power-user** | Client SRE / tech lead | Namespace onboarding via Portal: quota, RBAC, netpol (catalog-constrained) | `tenant-guardrails/` / `make guardrails-up` |
 | **Tenant (dev)** | Application developers | Workloads inside their namespace only | `tenant-apps/` / `make tenant-deploy` |
 
@@ -69,14 +71,14 @@ Power-users do **not** replace the platform: they instantiate **platform-approve
 
 | | **A. Shared cluster + namespaces** (PoC choice) | **B. Cluster-per-plane** |
 |--|--------------------------------------------------|--------------------------------------------------------------|
-| Shape | 1 Autopilot, 3 namespaces | 2+ clusters; team ↔ whole cluster |
-| Matches Confluence? | **Yes** — “shared regional clusters… namespaces per team/app with quotas, network policies” | Partial — stronger isolation, but not the documented **cost-optimised default** |
-| Cost (Autopilot idle) | One control plane; pay mainly for running Pods | More clusters / more baseline overhead |
+| Shape | 1 Standard + 1 pool, 3 namespaces | 2+ clusters; team ↔ whole cluster |
+| Matches Confluence? | **Yes** — “GKE Standard… shared regional clusters… namespaces per team/app with quotas, network policies” | Partial — stronger isolation, but not the documented **cost-optimised default** |
+| Cost | One control plane + small autoscaled pool | More clusters / more baseline overhead |
 | Isolation strength | Soft multi-tenancy (RBAC + netpol + quota) | Harder blast-radius split (separate kube-apiserver/nodes) |
 | Client story | “This is how the platform will host many apps” | “Premium / high-trust dedicated clusters” (catalog flavor later) |
 | Ops complexity | One upgrade surface; policies per ns | N clusters to register, upgrade, observe |
 
-**Reasoning for A:** Confluence Building Block View and cost goal (“share the expensive thing”) point to **shared multi-workload** clusters. Cluster-per-plane remains a valid **future catalog flavor**, not the PoC default.
+**Reasoning for A:** Confluence Building Block View and cost goal (“share the expensive thing”) point to **shared multi-workload Standard** clusters. Cluster-per-plane remains a valid **future catalog flavor**, not the PoC default.
 
 ### Fleet: use lightly, don’t make it the tenancy model
 
@@ -96,11 +98,11 @@ Docs: [Fleet concepts](https://cloud.google.com/kubernetes-engine/fleet-manageme
 
 ## 3. Client demo script — three planes
 
-Goal: live proof of **real GKE controls** with the right actors — platform paves runtime; power-user shapes namespaces; developers deploy inside.
+Goal: live proof of **real GKE controls** with the right actors — platform paves Standard runtime; power-user shapes namespaces; developers deploy inside.
 
 ### 3.0 Demo order (actors)
 
-1. **Platform:** show Autopilot + fleet membership.  
+1. **Platform:** Standard cluster + one node pool + private nodes + DNS + fleet; optional capacity playground (`make platform-nodes` / `platform-scale-up`).  
 2. **Power-user:** portal/CLI onboards `t1-front` / `t2-back` / `t3-db` with quotas + netpol + RBAC.  
 3. **Developer:** portal/CLI deploys probes into `t1-front` only.  
 4. Prove RBAC deny, quota fail, netpol ALLOW/DENY in logs.
@@ -163,19 +165,19 @@ make tenant-can-i TENANT=t2-back AS=roberto.comsa@esolutions.ro    # expect: no
 
 Note: `terraform apply` as project admin bypasses RBAC; use `tenant-can-i` (`kubectl --as`) for the Forbidden story.
 
-### 3.5 Suggested demo order (15–20 min)
+### 3.5 Suggested demo order
 
 See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 
 1. Three-plane slide: platform / SRE power-user / developer.  
-2. Platform: cluster + Fleet membership.  
+2. Platform: Standard + node pool + Fleet; optional capacity knobs.  
 3. Power-user: `make guardrails-up`.  
 4. Developer: `make tenant-deploy-all` + `make demo-logs TENANT=t1-front`.  
 5. RBAC: `make demo-rbac` → Forbidden on t2.  
 6. Quota: `make demo-quota` → pods=2 exceeded, then restore.  
 7. Map to Confluence / Backstage (two portal forms, one catalog).
 
-**PoC stops after this demo** (Phases A–E). No WI / Config Sync / second-cluster follow-on in this repo.
+**Tenancy demos (planes 2–3) come after platform Standard is proven.** Workload Identity / Config Sync / second cluster remain out of scope.
 
 ---
 
@@ -183,24 +185,28 @@ See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 
 | Showcase | Why | How |
 |----------|-----|-----|
-| Autopilot shared cluster | Fast PoC | `gke-cluster-autopilot` (**platform**) |
+| **Standard** shared cluster + one pool | Confluence **default** runtime | `gke-cluster-standard` + `gke-nodepool` (**platform**) |
+| Private nodes + DNS endpoint + NAT | Security-shaped access (LZ approx.) | `access_config` + `network.tf` NAT |
+| Capacity knobs | Catalog size / density / elasticity | `standard{}` in tfvars; `make platform-nodes` / `platform-scale-*` |
 | VPC-native subnet | Baseline | `network.tf` (**platform**) |
 | Fleet registration | Hub inventory | `fleet_project` + `gke-hub` (**platform**) |
 | Namespaces + RBAC + Quota + NetworkPolicy | Isolation catalog | `tenant-guardrails/` (**power-user**) |
 | Probe Deployments | Tenant self-service | `tenant-apps/` (**dev**) |
 | Release channel `REGULAR` | Upgrade story | Module `release_channel` |
 
-Out of scope for this PoC: Workload Identity demos, Config Sync, MCS/Mesh, second cluster.
+Out of scope for this PoC: Workload Identity demos, Config Sync, MCS/Mesh, second cluster, Argo CD.
 
-### Explicit “documented but not default in PoC”
+### Explicit “Confluence production vs PoC approximation”
 
 | Topic | Message to client |
 |-------|-------------------|
-| **GKE Standard + node pools** | Confluence **default**; fabric modules ready when PoC leaves Autopilot |
-| **Private clusters + Shared VPC** | LZ-mandated; out of scope unless network floor exists |
+| **GKE Standard + node pools** | **PoC default** — same Fabric modules Confluence expects |
+| **Shared VPC + private IP CP + authorized networks** | LZ-mandated in prod; PoC approximates with **project VPC + private nodes + DNS endpoint + Cloud NAT** |
+| **Autopilot** | Valid **future** catalog flavor for small/spiky workloads (Confluence: not the default) |
 | **Argo CD / GitOps** | Real app/power-user reconciler; PoC uses Terraform CLI stand-ins |
 | **Fleet scopes** | After single-cluster namespace tenancy |
 | **Full Fabric FAST stages** | This PoC is **modules only** (path B) |
+| **Workload Identity** | Confluence identity path; not built in this PoC |
 
 ---
 
@@ -208,24 +214,25 @@ Out of scope for this PoC: Workload Identity demos, Config Sync, MCS/Mesh, secon
 
 | Concern | Platform | Portal power-user (SRE / tech lead) | Tenant (dev) |
 |---------|----------|-------------------------------------|--------------|
-| Runtime | Shared Autopilot, fleet | Uses it | Uses it |
+| Runtime | Shared **Standard** + node pool + fleet | Uses it | Uses it |
 | Namespace | Catalog + policy floor | **Creates/shapes via portal** | Cannot create |
 | Quota / netpol / RBAC bindings | Catalog definitions | **Applies within catalog** | Cannot edit |
 | App delivery | — | — | **Deployments/Services in their ns** |
-| Cost fairness | Catalog tiers | Chooses tier at onboarding | Replicas inside quota |
+| Cost fairness | Catalog tiers (machine / min-max / density) | Chooses tier at onboarding | Replicas inside quota |
 | Isolation | Allowed netpol patterns | Picks chain pattern | Sees ALLOW/DENY only |
 
 ---
 
 ## 6. Implementation milestones
 
-1. Shared Autopilot + network + fleet (**platform**) — **done**  
-2. Verify Hub membership — manual / demo  
-3. Guardrails stack for three teams (**power-user**) — **done**  
-4. Tenant probe apps + Makefile portal (**dev**) — **done**  
-5. Negative tests + three-plane demo runbook — **done**  
+1. Shared Standard + network (project VPC / NAT) + private nodes + DNS + fleet (**platform**) — **in progress / apply**  
+2. Capacity playground (resources, max pods/node, autoscaling) — **scripts ready**  
+3. Verify Hub membership — manual / demo  
+4. Guardrails stack for three teams (**power-user**) — **done** (re-apply after Standard cutover)  
+5. Tenant probe apps + Makefile portal (**dev**) — **done** (re-apply after Standard cutover)  
+6. Negative tests + three-plane demo runbook — **done** (re-validate after cutover)  
 
-**Complete.** No further milestones in this PoC.
+Earlier Autopilot path was a temporary cost shortcut; runtime is now Confluence-aligned **Standard**.
 
 ---
 
@@ -235,19 +242,20 @@ Out of scope for this PoC: Workload Identity demos, Config Sync, MCS/Mesh, secon
 |----------|----------|
 | t3 read-only in front/back? | **No** for v1 |
 | Exact quota (e.g. pods=2 for front)? | **pods: "2"** for clearest scale demo |
-| NetworkPolicy DNS egress allow? | **Yes** (kube-dns) |
+| NetworkPolicy DNS egress allow? | **Yes** (kube-dns + Cloud DNS paths in guardrails) |
 | Principals = users or Groups? | Groups if available; else users for PoC |
 | Who raises quota above catalog? | Platform exception; power-user only within tiers |
 | Workload Identity in this PoC? | **No** — out of scope |
+| Shared VPC in this PoC? | **No** — project VPC approximation |
 
 ---
 
 ## 8. Verdict
 
-Locked PoC (**complete through Phase E**): **`roberto-gke` DEV · one fleet · one shared Autopilot · three namespaces · three actors**.
+Locked PoC: **`roberto-gke` DEV · one fleet · one shared Standard (+ one node pool) · three namespaces · three actors**.
 
-- **Platform** owns the runtime.  
+- **Platform** owns the Confluence-shaped Standard runtime (private nodes / DNS / capacity knobs).  
 - **Portal power-user** owns namespace onboarding (quota / RBAC / netpol) via portal.  
 - **Tenant developers** own workloads inside their namespace.  
-- Demo: RBAC + NetworkPolicy chain + ResourceQuota, told through those three roles.  
-- Out of scope: WI, Config Sync, MCS/Mesh, second cluster.
+- Demo: platform capacity + RBAC + NetworkPolicy chain + ResourceQuota, told through those three roles.  
+- Out of scope: WI, Config Sync, MCS/Mesh, second cluster, full Shared VPC / FAST.

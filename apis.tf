@@ -4,6 +4,7 @@ resource "google_project_service" "required" {
     "container.googleapis.com",
     "gkehub.googleapis.com",
     "gkeconnect.googleapis.com",
+    "iam.googleapis.com",
   ])
 
   project            = var.project_id

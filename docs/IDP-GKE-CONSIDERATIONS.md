@@ -4,7 +4,7 @@ What to take into account when deploying **multiple GKE cluster flavors** for an
 
 This document is **background / planning only** (flavors, trade-offs). It is **not** an active backlog for this repo.
 
-The implemented PoC stops at **Phase E** — see [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) and [../DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md). Workload Identity, Config Sync, and multi-cluster stretch items below were **not** built.
+The implemented PoC uses **Fabric Standard** as the shared runtime (Confluence default) — see [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) and [IDP-GKE-POC-FLEETS-TENANTS.md](IDP-GKE-POC-FLEETS-TENANTS.md). Workload Identity, Config Sync, and multi-cluster stretch items below were **not** built.
 
 ## Scope (assumed)
 
@@ -21,22 +21,24 @@ Adjust or drop a section if your POC only covers one side.
 
 | Item | Today in this repo |
 |------|--------------------|
-| Cluster mode | Autopilot via `fabric/modules/gke-cluster-autopilot` |
+| Cluster mode | **Standard** via `fabric/modules/gke-cluster-standard` + `gke-nodepool` (Confluence default) |
 | Fabric pin | [v57.0.0](../fabric/FABRIC_VERSION) |
-| Vendored modules | autopilot, standard, nodepool, hub |
-| Networking | Subnet + pods/services secondary ranges on the `default` VPC |
+| Vendored modules | standard, nodepool, hub (autopilot module still vendored, unused) |
+| Networking | Project VPC subnet + pods/services ranges; **Cloud NAT**; **private nodes** + **DNS endpoint** |
+| Capacity knobs | `standard{}` in tfvars: machine type, max pods/node, pool min/max |
+| Fleet | Registered via `fleet_project` + thin `gke-hub` |
 | State | Local Terraform state |
-| Multi-flavor switch | Not implemented (single Autopilot path in `gke.tf`) |
+| Multi-flavor switch | Not implemented (single Standard path in `gke.tf`) |
 
-**Gaps vs a production-shaped IDP:**
+**Gaps vs full Confluence / production IDP:**
 
-- No Fleet / `gke-hub` registration
-- No private control plane / private nodes pattern
-- No Shared VPC
-- No catalog of cluster flavors driven by variables
-- No remote state or teammate isolation story beyond ad-hoc tfvars
+- No Shared VPC (project VPC approximation)
+- No private IP control-plane + authorized networks (DNS endpoint instead)
+- No Workload Identity / Argo CD / Binary Authorization demos
+- No remote state or teammate isolation beyond ad-hoc tfvars
+- Autopilot remains a valid **future** catalog flavor, not this PoC’s runtime
 
-This matches **path B** from earlier exploration: use fabric **modules** in a demo project, not full Fabric FAST org stages.
+This matches **path B**: fabric **modules** in a demo project, not full Fabric FAST org stages.
 
 ---
 
@@ -62,7 +64,7 @@ Every cluster the IDP creates (or that hosts the IDP) should have explicit answe
 
 | Why it matters for IDP | Fabric knobs | Docs |
 |------------------------|--------------|------|
-| Default tenant offering is usually Autopilot (less ops). Standard is needed for custom node shapes, some DaemonSets, GPUs, or privileged/host patterns Autopilot restricts. | `gke-cluster-autopilot` vs `gke-cluster-standard` + `gke-nodepool` | [Choose cluster mode](https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode), [Autopilot overview](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview) |
+| Confluence default is **Standard** (shared multi-workload). Autopilot is optional for small/spiky or isolated workloads. Standard is required for explicit node pools, custom shapes, some DaemonSets, GPUs, or privileged/host patterns. | `gke-cluster-standard` + `gke-nodepool` (PoC default); optional `gke-cluster-autopilot` | [Choose cluster mode](https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode), Confluence Building Block View |
 
 ### Topology and upgrades
 
@@ -126,10 +128,10 @@ Implement later as thin wrappers / `flavor` switches—not in this doc phase.
 
 | Flavor ID | Mode | Typical IDP use | Fabric modules | Minimum inputs | Fleet |
 |-----------|------|-----------------|----------------|----------------|-------|
-| `platform-autopilot` | Autopilot | Portal, APIs, lightweight controllers | `gke-cluster-autopilot` | project, region, VPC/subnet (+ secondary ranges) | Recommended |
-| `tenant-autopilot` | Autopilot | Default app-team envs | `gke-cluster-autopilot` | Same + unique name/CIDRs per tenant | Recommended |
-| `tenant-standard` | Standard | Custom machines, DaemonSets, privileged/host needs | `gke-cluster-standard` + `gke-nodepool` | Above + machine type, min/max nodes | Optional |
+| `shared-standard` (PoC / Confluence default) | Standard | Shared multi-workload DEV/runtime | `gke-cluster-standard` + `gke-nodepool` | project, region, VPC/subnet, machine type, min/max, max pods | Recommended |
+| `tenant-standard` | Standard | Dedicated / custom machines, DaemonSets, privileged/host | same | Above + unique name/CIDRs | Optional |
 | `tenant-standard-gpu` | Standard + GPU pool | ML / inference (stretch) | `gke-cluster-standard` + GPU `gke-nodepool` | Above + accelerator type/count, drivers | Optional |
+| `tenant-autopilot` | Autopilot | Small/spiky or isolated project-per-app (Confluence: not default) | `gke-cluster-autopilot` | project, region, VPC/subnet | Optional |
 | `platform-cicd` | Autopilot or Standard | Isolated runners / build agents | autopilot **or** standard + nodepool | Prefer network isolation from prod tenants | Optional |
 
 ### What the IDP should collect from the user (per request)
@@ -148,9 +150,9 @@ Vendored in this repo @ v57.0.0:
 
 | Module | Role in IDP POC | Local README |
 |--------|-----------------|--------------|
-| `gke-cluster-autopilot` | Default platform + tenant Autopilot flavors | [README](../fabric/modules/gke-cluster-autopilot/README.md) |
-| `gke-cluster-standard` | Standard tenant / special platform needs | [README](../fabric/modules/gke-cluster-standard/README.md) |
-| `gke-nodepool` | Required companion for Standard (pools are not “free” with the cluster module alone in fabric’s model) | [README](../fabric/modules/gke-nodepool/README.md) |
+| `gke-cluster-standard` | **PoC / Confluence default** shared Standard runtime | [README](../fabric/modules/gke-cluster-standard/README.md) |
+| `gke-nodepool` | Required companion for Standard | [README](../fabric/modules/gke-nodepool/README.md) |
+| `gke-cluster-autopilot` | Optional future catalog flavor (vendored, unused in PoC path) | [README](../fabric/modules/gke-cluster-autopilot/README.md) |
 | `gke-hub` | Fleet membership and fleet features for multi-cluster IDP | [README](../fabric/modules/gke-hub/README.md) |
 
 Upstream: [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric).
@@ -178,11 +180,10 @@ Upstream: [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/cloud
 
 Checklist only—do not treat as done:
 
-1. Introduce a `flavor` (or equivalent) input and thin wrappers over fabric modules; keep a single GCP project for the demo.
+1. Keep Standard as the default catalog flavor; add Autopilot only as an explicit alternate.
 2. Parameterize network per owner/flavor (unique subnet names + non-overlapping CIDRs).
-3. Optionally register clusters with `gke-hub` for a multi-cluster story.
-4. Run one **platform** and one **tenant** cluster side by side to validate the catalog.
-5. If the POC graduates: Shared VPC, private clusters, remote state, and alignment with org FAST networking/security stages.
+3. Multi-cluster / Fleet scopes after single-cluster tenancy is solid.
+4. If the POC graduates: Shared VPC, private IP control plane + authorized networks, Workload Identity, remote state, FAST stages.
 
 ---
 
@@ -192,11 +193,11 @@ Use this section as a working checklist with stakeholders.
 
 | Question | Answer / notes |
 |----------|----------------|
-| Shared VPC (host project) or project-local VPC for the POC? | |
-| Fleet host project id? | |
-| Tenancy model: namespace-per-team, cluster-per-team, or hybrid? | |
-| Is GPU (`tenant-standard-gpu`) in scope for v1 of the POC? | |
-| Private-only API endpoint required (compliance)? | |
+| Shared VPC (host project) or project-local VPC for the POC? | **Project VPC** approximation; Shared VPC = prod/LZ |
+| Fleet host project id? | **Same as cluster** (`roberto-gke`) |
+| Tenancy model: namespace-per-team, cluster-per-team, or hybrid? | **Namespace-per-team** on shared Standard |
+| Is GPU (`tenant-standard-gpu`) in scope for v1 of the POC? | **No** |
+| Private-only API endpoint required (compliance)? | Prod: yes (LZ). PoC: **DNS endpoint** + private nodes |
 | Which IDP product (Backstage, Port, custom, other)? | |
 | Who owns Terraform state for tenant clusters (platform team vs pipeline per request)? | |
 | Prod-like release channel (`REGULAR` vs `STABLE`) for platform vs tenants? | |
@@ -206,7 +207,8 @@ Use this section as a working checklist with stakeholders.
 
 ## Related repo paths
 
-- Current Autopilot wiring: [`gke.tf`](../gke.tf)
-- Demo network: [`network.tf`](../network.tf)
+- Current Standard wiring: [`gke.tf`](../gke.tf)
+- Demo network + NAT: [`network.tf`](../network.tf)
 - Fabric pin: [`fabric/FABRIC_VERSION`](../fabric/FABRIC_VERSION)
-- Next PoC (locked scope + client demo): [IDP-GKE-POC-FLEETS-TENANTS.md](IDP-GKE-POC-FLEETS-TENANTS.md)
+- Locked scope + client demo: [IDP-GKE-POC-FLEETS-TENANTS.md](IDP-GKE-POC-FLEETS-TENANTS.md)
+- Live runbook: [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)

@@ -1,6 +1,7 @@
 # IDP PoC — three-plane helpers (Makefile = portal stand-in)
 
 .PHONY: platform-up platform-plan platform-down \
+	platform-nodes platform-scale-up platform-scale-up-blocked platform-scale-down \
 	guardrails-up guardrails-plan guardrails-down \
 	tenant-deploy tenant-deploy-all tenant-destroy tenant-destroy-all \
 	tenant-logs tenant-can-i demo-logs demo-rbac demo-quota \
@@ -37,9 +38,13 @@ else
 endif
 
 help:
-	@echo "make platform-up                         # plane 1 — cluster + fleet"
-	@echo "make guardrails-up                       # plane 2 — namespaces + guardrails"
-	@echo "make tenant-deploy TENANT=t1-front       # plane 3 — deploy one app"
+	@echo "make platform-up                         # plane 1 — Standard cluster + fleet"
+	@echo "make platform-nodes                      # capacity: nodes + allocatable"
+	@echo "make platform-scale-up-blocked           # capacity: CA refuses (request > node)"
+	@echo "make platform-scale-up                   # capacity: CA adds a node (fits node)"
+	@echo "make platform-scale-down                 # capacity: remove scale load"
+	@echo "make guardrails-up                       # plane 2 — namespaces + guardrails (later)"
+	@echo "make tenant-deploy TENANT=t1-front       # plane 3 — deploy one app (later)"
 	@echo "make tenant-deploy-all                   # deploy db, back, front"
 	@echo "make tenant-destroy TENANT=t1-front      # destroy one tenant app"
 	@echo "make tenant-destroy-all                  # destroy all tenant apps"
@@ -62,6 +67,18 @@ platform-up:
 platform-down:
 	terraform init -input=false
 	terraform destroy -input=false -auto-approve
+
+platform-nodes:
+	./scripts/platform-nodes.sh
+
+platform-scale-up-blocked:
+	MODE=blocked ./scripts/platform-scale-up.sh
+
+platform-scale-up:
+	MODE=ok ./scripts/platform-scale-up.sh
+
+platform-scale-down:
+	./scripts/platform-scale-down.sh
 
 guardrails-plan:
 	cd tenant-guardrails && terraform init -input=false && terraform plan -input=false

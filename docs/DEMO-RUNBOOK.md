@@ -1,16 +1,16 @@
-# Client demo runbook (Phase E)
+# Client demo runbook
 
-~15–20 minutes. Makefile / `scripts/` stand in for the portal.
+~15–25 minutes. Makefile / `scripts/` stand in for the portal.
+
+**Platform first:** Fabric **Standard** + one node pool (Confluence default). Guardrails / tenant apps after the capacity story.
 
 ## 0. Preconditions
 
 ```bash
 gcloud config set project roberto-gke
+make platform-up   # if cluster not up yet
 $(terraform output -raw get_credentials_command)
-kubectl get ns t1-front t2-back t3-db
 ```
-
-If the cluster or guardrails are missing: `make platform-up` then `make guardrails-up`.
 
 ---
 
@@ -18,28 +18,53 @@ If the cluster or guardrails are missing: `make platform-up` then `make guardrai
 
 Three planes:
 
-1. **Platform** — shared Autopilot + fleet  
+1. **Platform** — shared **Standard** cluster + one governed node pool + fleet  
+   - Approximation: **project VPC + private nodes + DNS endpoint + Cloud NAT** (prod = Shared VPC / LZ private floor)  
 2. **Portal power-user** (SRE / tech lead) — namespaces, quota, RBAC, NetworkPolicy  
 3. **Tenant (dev)** — Deployments / Services only inside their namespace  
 
 ---
 
-## 2. Platform — Hub membership
+## 2. Platform — Standard runtime + Hub
 
 ```bash
+terraform output cluster_name node_pool_machine_type max_pods_per_node node_pool_autoscaling
+terraform output -raw cluster_dns_endpoint
 terraform output fleet_membership_hint
 # or open:
 terraform output -raw fleet_console_url
 ```
 
-Show the cluster listed as a fleet member in Console / `gcloud container fleet memberships list`.
+Show in Console: Standard mode, private nodes, one pool, machine type, autoscaling, fleet member.
+
+### 2b. Capacity playground (platform-owned)
+
+Show allocatable first, then both autoscaler behaviors:
+
+```bash
+make platform-nodes
+
+# 1) Oversize request — platform correctly refuses to scale
+make platform-scale-up-blocked
+# Console: "Can't scale up … failing scheduling predicate"
+# Talk: catalog machine type must fit the pod; CA will not grow uselessly
+make platform-scale-down
+
+# 2) Fitting request — pack the pool, CA adds a node
+make platform-scale-up
+# Watch nodes grow (min→… within max)
+make platform-scale-down
+```
+
+Or edit `terraform.tfvars` → `standard{}` (`machine_type`, `max_pods_per_node`, `min_nodes` / `max_nodes`) and `make platform-up`.
 
 ---
 
-## 3. Power-user — guardrails already applied
+## 3. Power-user — guardrails
 
 ```bash
-make guardrails-up   # no-op if already applied
+make guardrails-up
+kubectl get ns t1-front t2-back t3-db
 kubectl get resourcequota,networkpolicy,rolebinding -n t1-front
 kubectl get resourcequota,networkpolicy,rolebinding -n t2-back
 kubectl get resourcequota,networkpolicy,rolebinding -n t3-db
@@ -59,7 +84,7 @@ Order is db → back → front so DNS peers exist.
 
 ---
 
-## 5. NetworkPolicy — live ALLOW / DENY logs (E1)
+## 5. NetworkPolicy — live ALLOW / DENY logs
 
 ```bash
 make demo-logs TENANT=t1-front
@@ -75,7 +100,7 @@ Optional: `make demo-logs TENANT=t2-back` (allow db, deny front).
 
 ---
 
-## 6. RBAC — t1 cannot deploy into t2 (E2)
+## 6. RBAC — t1 cannot deploy into t2
 
 ```bash
 make demo-rbac
@@ -86,7 +111,7 @@ Expect: **yes** on `t1-front`, **no** / Forbidden on `t2-back`.
 
 ---
 
-## 7. Quota — scale front 2 → 3 fails (E3)
+## 7. Quota — scale front 2 → 3 fails
 
 ```bash
 make demo-quota
@@ -106,4 +131,6 @@ make tenant-deploy TENANT=t1-front REPLICAS=3
 
 Map to a real IDP: Backstage power-user form → `tenant-guardrails`; developer form → `tenant-apps` / Argo. Same params, different UI.
 
-**PoC ends here** (Phases A–E). Workload Identity, Config Sync, and multi-cluster are explicitly out of scope.
+**Aligned with Confluence:** Standard shared runtime + namespace guardrails.  
+**Approximated:** project VPC + DNS endpoint (not full Shared VPC / private IP CP).  
+**Out of scope:** Workload Identity, Config Sync, multi-cluster.

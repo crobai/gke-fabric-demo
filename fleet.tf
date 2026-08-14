@@ -5,7 +5,7 @@ module "hub" {
   project_id = local.fleet_host_project
   location   = var.region
 
-  # Membership owned by fleet_project on the Autopilot module.
+  # Membership owned by fleet_project on the Standard cluster module.
   clusters = {}
 
   features = {

@@ -4,19 +4,19 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region for the subnet and Autopilot cluster."
+  description = "Region for the subnet and Standard cluster control plane."
   type        = string
   default     = "europe-west1"
 }
 
 variable "cluster_name" {
-  description = "GKE Autopilot cluster name (shared multi-tenant workload cluster)."
+  description = "GKE Standard cluster name (shared multi-tenant workload cluster)."
   type        = string
   default     = "gke-fabric-demo"
 }
 
 variable "release_channel" {
-  description = "GKE release channel for the Autopilot cluster."
+  description = "GKE release channel for the Standard cluster."
   type        = string
   default     = "REGULAR"
 
@@ -27,7 +27,7 @@ variable "release_channel" {
 }
 
 variable "network_name" {
-  description = "Existing VPC network name (default VPC for this demo)."
+  description = "Existing VPC network name (project VPC approximation — default VPC for this demo)."
   type        = string
   default     = "default"
 }
@@ -60,7 +60,7 @@ variable "fleet" {
   description = <<-EOT
     Fleet (GKE Hub) settings for the platform cluster.
     One fleet per GCP project; this PoC uses the same project as fleet host.
-    Membership is created via Autopilot fleet_project (gke.tf). The thin
+    Membership is created via Standard fleet_project (gke.tf). The thin
     gke-hub module (fleet.tf) is wired for later features — do not also put
     this cluster in hub.clusters or Hub will reject a duplicate membership.
   EOT
@@ -71,4 +71,31 @@ variable "fleet" {
   default = {
     enabled = true
   }
+}
+
+variable "standard" {
+  description = <<-EOT
+    IDP catalog-shaped Standard flavor knobs (Fabric gke-cluster-standard + gke-nodepool).
+    Playable: machine_type (resources), max_pods_per_node (density), min/max_nodes (autoscaling).
+  EOT
+  type = object({
+    dataplane_v2      = optional(bool, true)
+    max_pods_per_node = optional(number, 32)
+    # Single zone keeps regional CP cheap for the PoC (still a regional cluster).
+    node_locations = optional(list(string), ["europe-west1-b"])
+    access = optional(object({
+      private_nodes = optional(bool, true)
+      dns_endpoint  = optional(bool, true)
+    }), {})
+    node_pool = optional(object({
+      name              = optional(string, "default")
+      machine_type      = optional(string, "e2-standard-2")
+      disk_type         = optional(string, "pd-balanced")
+      disk_size_gb      = optional(number, 30)
+      max_pods_per_node = optional(number) # defaults to standard.max_pods_per_node
+      min_nodes         = optional(number, 1)
+      max_nodes         = optional(number, 3)
+    }), {})
+  })
+  default = {}
 }

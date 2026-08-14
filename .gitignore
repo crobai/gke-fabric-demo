@@ -11,3 +11,4 @@ override.tf.json
 .terraform.tfstate.lock.info
 docs/confluence/
 DEVELOPMENT_PLAN.md
+STANDARD_GKE_PLAN.md

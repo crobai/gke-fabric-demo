@@ -2,7 +2,7 @@
 
 PoC: simulate an IDP on GKE with [Cloud Foundation Fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) modules.
 
-**Scope complete through Phase E** (platform → power-user guardrails → tenant apps → demo scripts). No further phases in this repo.
+**Platform runtime:** Fabric **Standard** (`gke-cluster-standard` + one `gke-nodepool`) — project VPC + **private nodes** + **DNS endpoint** (LZ Shared VPC approximation). Guardrails / tenant apps are secondary after the platform capacity playground.
 
 ## Three planes
 
@@ -12,20 +12,28 @@ PoC: simulate an IDP on GKE with [Cloud Foundation Fabric](https://github.com/Go
 | **Portal power-user** | Client SRE / tech lead | [`tenant-guardrails/`](tenant-guardrails/) | `make guardrails-up` |
 | **Tenant (dev)** | Application developers | [`tenant-apps/`](tenant-apps/) | `make tenant-deploy` |
 
-## Quick start
+## Quick start (platform first)
 
 ```bash
 make platform-up
+$(terraform output -raw get_credentials_command)
+
+# Capacity playground — resources / max pods / autoscaling
+make platform-nodes
+make platform-scale-up-blocked   # CA refuses (request > node)
+make platform-scale-down
+make platform-scale-up           # CA adds a node
+make platform-scale-down
+
+# Later: same tenancy on this cluster
 make guardrails-up
 make tenant-deploy-all
-
-$(terraform output -raw get_credentials_command)
 make demo-logs TENANT=t1-front
 ```
 
-Expect front logs: `ALLOW ok` to back, `DENY timeout/fail` to db.
+Edit `terraform.tfvars` → `standard{}` to change `machine_type`, `max_pods_per_node`, or pool `min_nodes` / `max_nodes`, then `make platform-up`.
 
-### Negative demos
+### Negative demos (after guardrails)
 
 ```bash
 make demo-rbac     # t1 yes / t2 Forbidden
@@ -36,7 +44,7 @@ Full client order: [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md).
 
 ## Design docs
 
-- [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) — client demo script
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — implementation checklist (A–E done)
-- [docs/IDP-GKE-POC-FLEETS-TENANTS.md](docs/IDP-GKE-POC-FLEETS-TENANTS.md) — locked PoC scope
-- [docs/IDP-GKE-CONSIDERATIONS.md](docs/IDP-GKE-CONSIDERATIONS.md) — broader design notes (not PoC backlog)
+- [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) — client demo script (platform Standard first)
+- [docs/IDP-GKE-POC-FLEETS-TENANTS.md](docs/IDP-GKE-POC-FLEETS-TENANTS.md) — locked PoC scope vs Confluence
+- [docs/IDP-GKE-CONSIDERATIONS.md](docs/IDP-GKE-CONSIDERATIONS.md) — flavor catalog / trade-offs
+- [STANDARD_GKE_PLAN.md](STANDARD_GKE_PLAN.md) — Standard cutover / capacity playground (local)
