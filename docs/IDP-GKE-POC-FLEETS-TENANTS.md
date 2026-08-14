@@ -144,19 +144,35 @@ Narration: *Developers cannot weaken NetworkPolicy; they only see ALLOW/DENY in 
 - Developer: replicas 2 → OK; replicas 3 → exceeded.  
 - Raising quota = power-user (catalog) or platform exception — not the developer.
 
+**PoC command:**
+
+```bash
+make tenant-deploy TENANT=t1-front REPLICAS=3   # expect: exceeded quota (pods=2)
+```
+
 ### 3.4 RBAC — power-user binds, developer is confined
 
 Power-user binds team principals to namespace `edit`. Developers succeed only in their ns; cross-ns apply → **Forbidden**.
+
+**PoC commands** (your user is bound only to `t1-front` in `tenant-guardrails/terraform.tfvars`):
+
+```bash
+make tenant-can-i TENANT=t1-front AS=roberto.comsa@esolutions.ro   # expect: yes
+make tenant-can-i TENANT=t2-back AS=roberto.comsa@esolutions.ro    # expect: no
+```
+
+Note: `terraform apply` as project admin bypasses RBAC; use `tenant-can-i` (`kubectl --as`) for the Forbidden story.
 
 ### 3.5 Suggested demo order (15–20 min)
 
 1. Three-plane slide: platform / SRE power-user / developer.  
 2. Platform: cluster + Fleet membership.  
 3. Power-user: `make guardrails-up` (portal stand-in).  
-4. Developer: `make tenant-deploy` + live probe logs.  
-5. RBAC deny + quota fail.  
-6. Map to Confluence / Backstage (two portal forms, one catalog).  
-7. Optional WI / Config Sync teaser.
+4. Developer: `make tenant-deploy-all` + `make tenant-logs TENANT=t1-front`.  
+5. RBAC: `make tenant-can-i TENANT=t2-back AS=…` → **no**.  
+6. Quota: `make tenant-deploy TENANT=t1-front REPLICAS=3` → fail.  
+7. Map to Confluence / Backstage (two portal forms, one catalog).  
+8. Optional WI / Config Sync teaser.
 
 ---
 

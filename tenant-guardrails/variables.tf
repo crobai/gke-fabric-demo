@@ -16,6 +16,11 @@ variable "http_port" {
   default = 8080
 }
 
+variable "dns_egress_cidrs" {
+  type    = list(string)
+  default = ["169.254.20.10/32", "169.254.169.254/32"]
+}
+
 variable "tenants" {
   type = map(object({
     team_principals = list(string)

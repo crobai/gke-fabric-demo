@@ -162,6 +162,28 @@ resource "kubernetes_network_policy_v1" "tenant" {
     }
 
     dynamic "egress" {
+      for_each = length(var.dns_egress_cidrs) > 0 ? [""] : []
+      content {
+        dynamic "to" {
+          for_each = var.dns_egress_cidrs
+          content {
+            ip_block {
+              cidr = to.value
+            }
+          }
+        }
+        ports {
+          port     = "53"
+          protocol = "UDP"
+        }
+        ports {
+          port     = "53"
+          protocol = "TCP"
+        }
+      }
+    }
+
+    dynamic "egress" {
       for_each = each.value.allow_egress
       content {
         to {
