@@ -165,12 +165,14 @@ Note: `terraform apply` as project admin bypasses RBAC; use `tenant-can-i` (`kub
 
 ### 3.5 Suggested demo order (15–20 min)
 
+See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
+
 1. Three-plane slide: platform / SRE power-user / developer.  
 2. Platform: cluster + Fleet membership.  
-3. Power-user: `make guardrails-up` (portal stand-in).  
-4. Developer: `make tenant-deploy-all` + `make tenant-logs TENANT=t1-front`.  
-5. RBAC: `make tenant-can-i TENANT=t2-back AS=…` → **no**.  
-6. Quota: `make tenant-deploy TENANT=t1-front REPLICAS=3` → fail.  
+3. Power-user: `make guardrails-up`.  
+4. Developer: `make tenant-deploy-all` + `make demo-logs TENANT=t1-front`.  
+5. RBAC: `make demo-rbac` → Forbidden on t2.  
+6. Quota: `make demo-quota` → pods=2 exceeded, then restore.  
 7. Map to Confluence / Backstage (two portal forms, one catalog).  
 8. Optional WI / Config Sync teaser.
 

@@ -18,24 +18,23 @@ make guardrails-up
 make tenant-deploy-all
 
 $(terraform output -raw get_credentials_command)
-make tenant-logs TENANT=t1-front
+make demo-logs TENANT=t1-front
 ```
 
 Expect front logs: `ALLOW ok` to back, `DENY timeout/fail` to db.
 
-### Negative demos (client showcase)
+### Negative demos (Phase E)
 
 ```bash
-# RBAC — user bound only to t1-front
-make tenant-can-i TENANT=t1-front AS=roberto.comsa@esolutions.ro   # yes
-make tenant-can-i TENANT=t2-back AS=roberto.comsa@esolutions.ro    # no
-
-# Quota — t1-front pods=2
-make tenant-deploy TENANT=t1-front REPLICAS=3                     # exceeded quota
+make demo-rbac     # t1 yes / t2 Forbidden
+make demo-quota    # scale front 2→3 exceeds pods=2, then restore
 ```
+
+Full client order: [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md).
 
 ## Design docs
 
 - [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — implementation checklist + actor model
+- [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) — client demo script (Phase E)
 - [docs/IDP-GKE-POC-FLEETS-TENANTS.md](docs/IDP-GKE-POC-FLEETS-TENANTS.md) — locked PoC scope + client demo
 - [docs/IDP-GKE-CONSIDERATIONS.md](docs/IDP-GKE-CONSIDERATIONS.md) — flavors, fabric modules

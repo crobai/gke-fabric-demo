@@ -1,9 +1,11 @@
 .PHONY: platform-up platform-plan guardrails-up guardrails-plan \
-	tenant-deploy tenant-deploy-all tenant-logs tenant-can-i help
+	tenant-deploy tenant-deploy-all tenant-logs tenant-can-i \
+	demo-logs demo-rbac demo-quota help
 
 TENANT ?= t1-front
 IMAGE  ?= python:3.12-alpine
 AS     ?=
+FOLLOW ?= 0
 
 ifeq ($(TENANT),t1-front)
   APP_NAME := front
@@ -35,8 +37,11 @@ help:
 	@echo "make guardrails-up                       # plane 2 — namespaces + guardrails"
 	@echo "make tenant-deploy TENANT=t1-front       # plane 3 — deploy one app"
 	@echo "make tenant-deploy-all                   # deploy db, back, front"
-	@echo "make tenant-logs TENANT=t1-front         # follow ALLOW/DENY logs"
-	@echo "make tenant-can-i TENANT=t2-back AS=email@x  # RBAC check as User"
+	@echo "make demo-logs TENANT=t1-front           # E1 — recent ALLOW/DENY logs"
+	@echo "make demo-logs FOLLOW=1                  # E1 — follow logs"
+	@echo "make demo-rbac                           # E2 — RBAC deny cross-ns"
+	@echo "make demo-quota                          # E3 — scale past pods=2, restore"
+	@echo "see docs/DEMO-RUNBOOK.md                 # E4 — full client demo order"
 
 platform-plan:
 	terraform init -input=false
@@ -70,9 +75,15 @@ tenant-deploy-all:
 	$(MAKE) tenant-deploy TENANT=t2-back
 	$(MAKE) tenant-deploy TENANT=t1-front
 
-tenant-logs:
-	kubectl logs -n "$(TENANT)" "deploy/$(APP_NAME)" -f | grep -E 'ALLOW|DENY|FAIL|listening'
+tenant-logs demo-logs:
+	TENANT="$(TENANT)" APP_NAME="$(APP_NAME)" FOLLOW="$(FOLLOW)" ./scripts/show-probe-logs.sh
 
 tenant-can-i:
 	@test -n "$(AS)" || (echo "Usage: make tenant-can-i TENANT=t2-back AS=roberto.comsa@esolutions.ro"; exit 1)
 	kubectl auth can-i create deployments -n "$(TENANT)" --as="$(AS)"
+
+demo-rbac:
+	AS="$(if $(AS),$(AS),roberto.comsa@esolutions.ro)" ./scripts/demo-rbac-deny.sh
+
+demo-quota:
+	TENANT=t1-front APP_NAME=front ./scripts/demo-quota-exceeded.sh
