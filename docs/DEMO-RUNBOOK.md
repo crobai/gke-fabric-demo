@@ -106,4 +106,4 @@ make tenant-deploy TENANT=t1-front REPLICAS=3
 
 Map to a real IDP: Backstage power-user form → `tenant-guardrails`; developer form → `tenant-apps` / Argo. Same params, different UI.
 
-Optional stretch (Phase F): Workload Identity, Config Sync.
+**PoC ends here** (Phases A–E). Workload Identity, Config Sync, and multi-cluster are explicitly out of scope.

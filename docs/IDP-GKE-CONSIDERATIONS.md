@@ -2,7 +2,9 @@
 
 What to take into account when deploying **multiple GKE cluster flavors** for an Internal Developer Platform (IDP), using [Cloud Foundation Fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) modules.
 
-This document is **planning only**. It does not change Terraform in this repo yet.
+This document is **background / planning only** (flavors, trade-offs). It is **not** an active backlog for this repo.
+
+The implemented PoC stops at **Phase E** — see [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) and [../DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md). Workload Identity, Config Sync, and multi-cluster stretch items below were **not** built.
 
 ## Scope (assumed)
 

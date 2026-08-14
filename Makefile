@@ -1,6 +1,10 @@
-.PHONY: platform-up platform-plan guardrails-up guardrails-plan \
-	tenant-deploy tenant-deploy-all tenant-logs tenant-can-i \
-	demo-logs demo-rbac demo-quota help
+# IDP PoC — three-plane helpers (Makefile = portal stand-in)
+
+.PHONY: platform-up platform-plan platform-down \
+	guardrails-up guardrails-plan guardrails-down \
+	tenant-deploy tenant-deploy-all tenant-destroy tenant-destroy-all \
+	tenant-logs tenant-can-i demo-logs demo-rbac demo-quota \
+	destroy-all help
 
 TENANT ?= t1-front
 IMAGE  ?= python:3.12-alpine
@@ -37,8 +41,12 @@ help:
 	@echo "make guardrails-up                       # plane 2 — namespaces + guardrails"
 	@echo "make tenant-deploy TENANT=t1-front       # plane 3 — deploy one app"
 	@echo "make tenant-deploy-all                   # deploy db, back, front"
+	@echo "make tenant-destroy TENANT=t1-front      # destroy one tenant app"
+	@echo "make tenant-destroy-all                  # destroy all tenant apps"
+	@echo "make guardrails-down                     # destroy namespaces + guardrails"
+	@echo "make platform-down                       # destroy cluster + fleet"
+	@echo "make destroy-all                         # apps → guardrails → platform"
 	@echo "make demo-logs TENANT=t1-front           # E1 — recent ALLOW/DENY logs"
-	@echo "make demo-logs FOLLOW=1                  # E1 — follow logs"
 	@echo "make demo-rbac                           # E2 — RBAC deny cross-ns"
 	@echo "make demo-quota                          # E3 — scale past pods=2, restore"
 	@echo "see docs/DEMO-RUNBOOK.md                 # E4 — full client demo order"
@@ -51,11 +59,19 @@ platform-up:
 	terraform init -input=false
 	terraform apply -input=false
 
+platform-down:
+	terraform init -input=false
+	terraform destroy -input=false -auto-approve
+
 guardrails-plan:
 	cd tenant-guardrails && terraform init -input=false && terraform plan -input=false
 
 guardrails-up:
 	cd tenant-guardrails && terraform init -input=false && terraform apply -input=false
+
+guardrails-down:
+	cd tenant-guardrails && terraform init -input=false
+	cd tenant-guardrails && terraform destroy -input=false -auto-approve
 
 tf_list = $(shell python3 -c 'import sys; xs=sys.argv[1].split(); print("["+",".join("\"%s\""%x for x in xs)+"]")' "$(1)")
 
@@ -74,6 +90,27 @@ tenant-deploy-all:
 	$(MAKE) tenant-deploy TENANT=t3-db
 	$(MAKE) tenant-deploy TENANT=t2-back
 	$(MAKE) tenant-deploy TENANT=t1-front
+
+tenant-destroy:
+	cd tenant-apps && terraform init -input=false
+	cd tenant-apps && terraform workspace select -or-create "$(TENANT)"
+	cd tenant-apps && terraform destroy -input=false -auto-approve \
+		-var="tenant=$(TENANT)" \
+		-var="app_name=$(APP_NAME)" \
+		-var="replicas=$(REPLICAS)" \
+		-var="image=$(IMAGE)" \
+		-var='targets_allow=$(call tf_list,$(TARGETS_ALLOW))' \
+		-var='targets_deny=$(call tf_list,$(TARGETS_DENY))'
+
+tenant-destroy-all:
+	$(MAKE) tenant-destroy TENANT=t1-front
+	$(MAKE) tenant-destroy TENANT=t2-back
+	$(MAKE) tenant-destroy TENANT=t3-db
+
+destroy-all:
+	$(MAKE) tenant-destroy-all
+	$(MAKE) guardrails-down
+	$(MAKE) platform-down
 
 tenant-logs demo-logs:
 	TENANT="$(TENANT)" APP_NAME="$(APP_NAME)" FOLLOW="$(FOLLOW)" ./scripts/show-probe-logs.sh

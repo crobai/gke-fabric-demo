@@ -173,8 +173,9 @@ See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 4. Developer: `make tenant-deploy-all` + `make demo-logs TENANT=t1-front`.  
 5. RBAC: `make demo-rbac` → Forbidden on t2.  
 6. Quota: `make demo-quota` → pods=2 exceeded, then restore.  
-7. Map to Confluence / Backstage (two portal forms, one catalog).  
-8. Optional WI / Config Sync teaser.
+7. Map to Confluence / Backstage (two portal forms, one catalog).
+
+**PoC stops after this demo** (Phases A–E). No WI / Config Sync / second-cluster follow-on in this repo.
 
 ---
 
@@ -187,8 +188,9 @@ See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 | Fleet registration | Hub inventory | `fleet_project` + `gke-hub` (**platform**) |
 | Namespaces + RBAC + Quota + NetworkPolicy | Isolation catalog | `tenant-guardrails/` (**power-user**) |
 | Probe Deployments | Tenant self-service | `tenant-apps/` (**dev**) |
-| Workload Identity (light) | Confluence GCP access path | Stretch |
 | Release channel `REGULAR` | Upgrade story | Module `release_channel` |
+
+Out of scope for this PoC: Workload Identity demos, Config Sync, MCS/Mesh, second cluster.
 
 ### Explicit “documented but not default in PoC”
 
@@ -217,12 +219,13 @@ See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 
 ## 6. Implementation milestones
 
-1. Shared Autopilot + network + fleet (**platform**) — done.  
-2. Verify Hub membership.  
-3. Guardrails stack for three teams (**power-user**) — code done; apply next.  
-4. Tenant probe apps + portal CLI (**dev**).  
-5. Negative tests + three-plane demo runbook.  
-6. Optional: WI / Config Sync.
+1. Shared Autopilot + network + fleet (**platform**) — **done**  
+2. Verify Hub membership — manual / demo  
+3. Guardrails stack for three teams (**power-user**) — **done**  
+4. Tenant probe apps + Makefile portal (**dev**) — **done**  
+5. Negative tests + three-plane demo runbook — **done**  
+
+**Complete.** No further milestones in this PoC.
 
 ---
 
@@ -235,15 +238,16 @@ See **[DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)** for the live script. Summary:
 | NetworkPolicy DNS egress allow? | **Yes** (kube-dns) |
 | Principals = users or Groups? | Groups if available; else users for PoC |
 | Who raises quota above catalog? | Platform exception; power-user only within tiers |
-| Include WI in first client demo? | **Yes if time** |
+| Workload Identity in this PoC? | **No** — out of scope |
 
 ---
 
 ## 8. Verdict
 
-Locked PoC: **`roberto-gke` DEV · one fleet · one shared Autopilot · three namespaces · three actors**.
+Locked PoC (**complete through Phase E**): **`roberto-gke` DEV · one fleet · one shared Autopilot · three namespaces · three actors**.
 
 - **Platform** owns the runtime.  
 - **Portal power-user** owns namespace onboarding (quota / RBAC / netpol) via portal.  
 - **Tenant developers** own workloads inside their namespace.  
-- Demo: RBAC + NetworkPolicy chain + ResourceQuota, told through those three roles.
+- Demo: RBAC + NetworkPolicy chain + ResourceQuota, told through those three roles.  
+- Out of scope: WI, Config Sync, MCS/Mesh, second cluster.

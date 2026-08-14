@@ -2,6 +2,8 @@
 
 PoC: simulate an IDP on GKE with [Cloud Foundation Fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) modules.
 
+**Scope complete through Phase E** (platform → power-user guardrails → tenant apps → demo scripts). No further phases in this repo.
+
 ## Three planes
 
 | Plane | Who | Directory | Command |
@@ -23,7 +25,7 @@ make demo-logs TENANT=t1-front
 
 Expect front logs: `ALLOW ok` to back, `DENY timeout/fail` to db.
 
-### Negative demos (Phase E)
+### Negative demos
 
 ```bash
 make demo-rbac     # t1 yes / t2 Forbidden
@@ -34,7 +36,7 @@ Full client order: [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md).
 
 ## Design docs
 
-- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — implementation checklist + actor model
-- [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) — client demo script (Phase E)
-- [docs/IDP-GKE-POC-FLEETS-TENANTS.md](docs/IDP-GKE-POC-FLEETS-TENANTS.md) — locked PoC scope + client demo
-- [docs/IDP-GKE-CONSIDERATIONS.md](docs/IDP-GKE-CONSIDERATIONS.md) — flavors, fabric modules
+- [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) — client demo script
+- [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — implementation checklist (A–E done)
+- [docs/IDP-GKE-POC-FLEETS-TENANTS.md](docs/IDP-GKE-POC-FLEETS-TENANTS.md) — locked PoC scope
+- [docs/IDP-GKE-CONSIDERATIONS.md](docs/IDP-GKE-CONSIDERATIONS.md) — broader design notes (not PoC backlog)
