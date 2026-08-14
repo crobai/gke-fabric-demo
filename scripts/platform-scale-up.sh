@@ -16,17 +16,15 @@ case "${MODE}" in
   ok|scale|success)
     MODE=ok
     NAME="${NAME:-scale-burst}"
-    # 2× ~900m packs a busy e2-standard-2 and forces a 2nd node once system pods are counted.
-    REPLICAS="${REPLICAS:-2}"
-    CPU_REQUEST="${CPU_REQUEST:-900m}"
+    REPLICAS="${REPLICAS:-4}"
+    CPU_REQUEST="${CPU_REQUEST:-250m}"
     EXPECT="EXPECT: some pods pending on the 1st node → Cluster Autoscaler adds node(s), up to pool max."
     ;;
   blocked|fail|predicate)
     MODE=blocked
     NAME="${NAME:-scale-blocked}"
     REPLICAS="${REPLICAS:-1}"
-    # Above e2-standard-2 allocatable (~1900m) so a new identical node still cannot place it.
-    CPU_REQUEST="${CPU_REQUEST:-2500m}"
+    CPU_REQUEST="${CPU_REQUEST:-1200m}"
     EXPECT="EXPECT: CA does NOT scale up — request exceeds a single node's allocatable (~1.9 CPU on e2-standard-2)."
     ;;
   *)

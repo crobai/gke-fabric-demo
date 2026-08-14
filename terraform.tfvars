@@ -10,7 +10,7 @@ fleet = {
 # Network approximation: project VPC + private nodes + DNS endpoint.
 standard = {
   dataplane_v2      = true
-  max_pods_per_node = 32
+  max_pods_per_node = 64
   node_locations    = ["europe-west1-b"]
 
   access = {
@@ -20,10 +20,10 @@ standard = {
 
   node_pool = {
     name         = "default"
-    machine_type = "e2-standard-2" # was e2-medium; more headroom for system pods + scale demos
+    machine_type = "e2-medium"
     disk_type    = "pd-balanced"
     disk_size_gb = 30
     min_nodes    = 1
-    max_nodes    = 3 # demo headroom; idle can set 2
+    max_nodes    = 4
   }
 }
